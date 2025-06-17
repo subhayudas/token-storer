@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Google OAuth with Supabase</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #4285f4;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .content {
+            padding: 2rem;
+        }
+
+        .user-info {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid #4285f4;
+        }
+
+        .info-card h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .info-card p {
+            color: #666;
+            word-break: break-all;
+        }
+
+        .profile-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .profile-picture {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #4285f4;
+        }
+
+        .profile-info h2 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-info p {
+            color: #666;
+        }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #4285f4;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+            transform: translateY(-2px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .profile-section {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Dashboard</h1>
+            <p>Welcome to your personalized dashboard</p>
+        </div>
+
+        <div class="content">
+            <div id="loading" class="loading">
+                Loading your information...
+            </div>
+
+            <div id="error" class="error" style="display: none;">
+                Failed to load user information. Please try refreshing the page.
+            </div>
+
+            <div id="user-content" style="display: none;">
+                <div class="profile-section">
+                    <img id="profilePicture" class="profile-picture" src="" alt="Profile Picture">
+                    <div class="profile-info">
+                        <h2 id="userName"></h2>
+                        <p id="userEmail"></p>
+                    </div>
+                </div>
+
+                <div class="user-info">
+                    <div class="info-card">
+                        <h3>Google ID</h3>
+                        <p id="googleId"></p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Account Created</h3>
+                        <p id="createdAt"></p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Last Updated</h3>
+                        <p id="updatedAt"></p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Authentication Provider</h3>
+                        <p id="provider"></p>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
+                    <a href="/logout" class="btn btn-secondary">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadUserData() {
+            try {
+                console.log('Fetching user data from /api/user...');
+                const response = await fetch('/api/user');
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Response not OK:', response.status, errorText);
+                    throw new Error(`Failed to fetch user data: ${response.status} ${errorText}`);
+                }
+                
+                const user = await response.json();
+                console.log('Received user data:', user);
+                
+                if (!user || typeof user !== 'object') {
+                    throw new Error('Invalid user data received');
+                }
+                
+                displayUserData(user);
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = `Failed to load user information: ${error.message}. Please try refreshing the page.`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function displayUserData(user) {
+            console.log('Displaying user data:', user);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('user-content').style.display = 'block';
+
+            // Handle profile picture with fallback
+            const profileImg = document.getElementById('profilePicture');
+            if (user.profile_picture) {
+                profileImg.src = user.profile_picture;
+                profileImg.onerror = function() {
+                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiM0Mjg1RjQiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5VPC90ZXh0Pgo8L3N2Zz4K';
+                };
+            } else {
+                profileImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiM0Mjg1RjQiLz4KPHRleHQgeD0iNDAiIHk9IjQ1IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5VPC90ZXh0Pgo8L3N2Zz4K';
+            }
+
+            document.getElementById('userName').textContent = user.name || 'Unknown User';
+            document.getElementById('userEmail').textContent = user.email || 'No email provided';
+            document.getElementById('googleId').textContent = user.google_id || 'N/A';
+            
+            // Handle dates safely
+            try {
+                document.getElementById('createdAt').textContent = user.created_at ? 
+                    new Date(user.created_at).toLocaleString() : 'N/A';
+                document.getElementById('updatedAt').textContent = user.updated_at ? 
+                    new Date(user.updated_at).toLocaleString() : 'N/A';
+            } catch (e) {
+                console.error('Error formatting dates:', e);
+                document.getElementById('createdAt').textContent = 'Invalid date';
+                document.getElementById('updatedAt').textContent = 'Invalid date';
+            }
+            
+            document.getElementById('provider').textContent = user.provider || 'google';
+        }
+
+        function refreshData() {
+            document.getElementById('user-content').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            loadUserData();
+        }
+
+        // Load user data when page loads
+        document.addEventListener('DOMContentLoaded', loadUserData);
+    </script>
+</body>
+</html> 
