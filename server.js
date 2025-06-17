@@ -27,8 +27,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 }));
 
@@ -36,11 +38,24 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Determine the callback URL based on environment
+const getCallbackURL = () => {
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/auth/google/callback`;
+  }
+  if (process.env.NODE_ENV === 'production' && process.env.PRODUCTION_URL) {
+    return `${process.env.PRODUCTION_URL}/auth/google/callback`;
+  }
+  return process.env.CALLBACK_URL || "http://localhost:3000/auth/google/callback";
+};
+
+console.log('Using callback URL:', getCallbackURL());
+
 // Passport Google OAuth Strategy
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: process.env.CALLBACK_URL || "http://localhost:3000/auth/google/callback"
+  callbackURL: getCallbackURL()
 }, async (accessToken, refreshToken, profile, done) => {
   try {
     console.log('=== Google OAuth Callback ===');
@@ -248,9 +263,17 @@ app.get('/api/test-db', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log('Make sure to:');
-  console.log('1. Set up your Google OAuth credentials');
-  console.log('2. Configure your Supabase database');
-  console.log('3. Create a .env file with your configuration');
+  console.log(`Server running on port ${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV || 'development');
+  console.log('Callback URL:', getCallbackURL());
+  console.log('Supabase URL:', process.env.SUPABASE_URL ? 'Configured' : 'Missing');
+  console.log('Google Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Configured' : 'Missing');
+  
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Local development server running on http://localhost:' + PORT);
+    console.log('Make sure to:');
+    console.log('1. Set up your Google OAuth credentials');
+    console.log('2. Configure your Supabase database');
+    console.log('3. Create a .env file with your configuration');
+  }
 }); 
