@@ -182,7 +182,11 @@ app.get('/', (req, res) => {
 
 // Auth routes
 app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'],
+    accessType: 'offline',
+    prompt: 'consent'
+  })
 );
 
 app.get('/auth/google/callback',
