@@ -53,7 +53,8 @@ const getCallbackURL = () => {
   // For production without custom URL, try to detect from request headers
   if (process.env.NODE_ENV === 'production') {
     // Fallback to a default production URL if available
-    return process.env.CALLBACK_URL || "https://auth-token-testing.vercel.app/auth/google/callback";
+    // Use the actual Vercel deployment URL
+    return process.env.CALLBACK_URL || "https://token-storer.vercel.app/auth/google/callback";
   }
   
   // Local development
@@ -218,7 +219,18 @@ app.get('/auth/google', (req, res, next) => {
 });
 
 app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/?error=auth_failed' }),
+  (req, res, next) => {
+    console.log('=== OAuth Callback Received ===');
+    console.log('Host:', req.headers.host);
+    console.log('Protocol:', req.headers['x-forwarded-proto'] || req.protocol);
+    console.log('Full URL:', `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers.host}${req.originalUrl}`);
+    console.log('Query params:', req.query);
+    next();
+  },
+  passport.authenticate('google', { 
+    failureRedirect: '/?error=auth_failed',
+    failureMessage: true
+  }),
   (req, res) => {
     console.log('=== OAuth Callback Success ===');
     console.log('User authenticated:', req.isAuthenticated());
@@ -249,6 +261,20 @@ app.get('/dashboard', (req, res) => {
     return res.redirect('/');
   }
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Debug route to check callback URL
+app.get('/api/debug', (req, res) => {
+  res.json({
+    staticCallbackURL: getCallbackURL(),
+    dynamicCallbackURL: getDynamicCallbackURL(req),
+    host: req.headers.host,
+    protocol: req.headers['x-forwarded-proto'] || req.protocol,
+    environment: process.env.NODE_ENV,
+    vercelUrl: process.env.VERCEL_URL,
+    productionUrl: process.env.PRODUCTION_URL,
+    callbackUrl: process.env.CALLBACK_URL
+  });
 });
 
 // API routes
