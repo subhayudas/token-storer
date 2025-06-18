@@ -40,25 +40,28 @@ app.use(passport.session());
 
 // Determine the callback URL based on environment
 const getCallbackURL = () => {
-  // For Vercel deployments, use the VERCEL_URL environment variable
+  // Priority 1: Use explicitly set CALLBACK_URL if provided
+  if (process.env.CALLBACK_URL) {
+    return process.env.CALLBACK_URL;
+  }
+  
+  // Priority 2: For Vercel deployments, use the VERCEL_URL environment variable
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}/auth/google/callback`;
   }
   
-  // For production with custom domain
+  // Priority 3: For production with custom domain
   if (process.env.NODE_ENV === 'production' && process.env.PRODUCTION_URL) {
     return `${process.env.PRODUCTION_URL}/auth/google/callback`;
   }
   
-  // For production without custom URL, try to detect from request headers
+  // Priority 4: For production without custom URL, use default Vercel URL
   if (process.env.NODE_ENV === 'production') {
-    // Fallback to a default production URL if available
-    // Use the actual Vercel deployment URL
-    return process.env.CALLBACK_URL || "https://token-storer.vercel.app/auth/google/callback";
+    return "https://token-storer.vercel.app/auth/google/callback";
   }
   
-  // Local development
-  return process.env.CALLBACK_URL || "http://localhost:3000/auth/google/callback";
+  // Priority 5: Local development default
+  return "http://localhost:3000/auth/google/callback";
 };
 
 console.log('Using callback URL:', getCallbackURL());
