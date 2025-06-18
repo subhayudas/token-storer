@@ -40,16 +40,36 @@ app.use(passport.session());
 
 // Determine the callback URL based on environment
 const getCallbackURL = () => {
+  // For Vercel deployments, use the VERCEL_URL environment variable
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}/auth/google/callback`;
   }
+  
+  // For production with custom domain
   if (process.env.NODE_ENV === 'production' && process.env.PRODUCTION_URL) {
     return `${process.env.PRODUCTION_URL}/auth/google/callback`;
   }
+  
+  // For production without custom URL, try to detect from request headers
+  if (process.env.NODE_ENV === 'production') {
+    // Fallback to a default production URL if available
+    return process.env.CALLBACK_URL || "https://auth-token-testing.vercel.app/auth/google/callback";
+  }
+  
+  // Local development
   return process.env.CALLBACK_URL || "http://localhost:3000/auth/google/callback";
 };
 
 console.log('Using callback URL:', getCallbackURL());
+
+// Dynamic callback URL function that uses request context
+const getDynamicCallbackURL = (req) => {
+  if (req && req.headers && req.headers.host) {
+    const protocol = req.headers['x-forwarded-proto'] || (req.connection.encrypted ? 'https' : 'http');
+    return `${protocol}://${req.headers.host}/auth/google/callback`;
+  }
+  return getCallbackURL();
+};
 
 // Passport Google OAuth Strategy
 passport.use(new GoogleStrategy({
@@ -181,13 +201,21 @@ app.get('/', (req, res) => {
 });
 
 // Auth routes
-app.get('/auth/google',
+app.get('/auth/google', (req, res, next) => {
+  // Log the current request details for debugging
+  console.log('=== Auth Request Debug ===');
+  console.log('Host:', req.headers.host);
+  console.log('Protocol:', req.headers['x-forwarded-proto'] || req.protocol);
+  console.log('Original URL:', req.originalUrl);
+  console.log('Dynamic Callback URL:', getDynamicCallbackURL(req));
+  console.log('Static Callback URL:', getCallbackURL());
+  
   passport.authenticate('google', { 
     scope: ['profile', 'email'],
     accessType: 'offline',
     prompt: 'consent'
-  })
-);
+  })(req, res, next);
+});
 
 app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/?error=auth_failed' }),
