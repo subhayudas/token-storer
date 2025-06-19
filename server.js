@@ -214,8 +214,17 @@ app.get('/auth/google', (req, res, next) => {
   console.log('Dynamic Callback URL:', getDynamicCallbackURL(req));
   console.log('Static Callback URL:', getCallbackURL());
   
+  const scopes = [
+    'profile', 
+    'email',
+    'https://www.googleapis.com/auth/gmail.labels',
+    'https://www.googleapis.com/auth/gmail.modify'
+  ];
+  
+  console.log('Requesting OAuth scopes:', scopes);
+  
   passport.authenticate('google', { 
-    scope: ['profile', 'email'],
+    scope: scopes,
     accessType: 'offline',
     prompt: 'consent'
   })(req, res, next);
